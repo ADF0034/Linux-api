@@ -1,0 +1,135 @@
+from cgi import test
+from datetime import date
+import json
+from operator import truediv
+import threading
+from tkinter import Y
+import grovepi
+import time
+import math
+import requests
+from pathlib import PurePath
+import os
+import socket
+
+white = 1   # The White colored sensor.
+button = 3 # D3 skal button sættes i
+led = 5 # D5 er der hvor led skal sættes i 
+ledtwo = 6# D6 er der hvor den anden led skal sættes i
+humidityandtemp = 8 # D4 er der hvor humidity og temp skal sættes i
+sound_sensor = 0 # A0 er der hvor lydsensoren skal sættes i
+Id=""
+tjekomtemp=True
+humidity=0
+temp=0
+noise=0
+startmessage = True
+onetime = True
+grovepi.pinMode(button,"INPUT")
+grovepi.pinMode(sound_sensor,"INPUT")
+testurl = "http://192.168.1.132:5000/testrun"
+logurl= "http://192.168.1.132:5000/DB"
+path = 'ID'
+def buttontest():
+    while(True):
+        buttontjek = grovepi.digitalRead(button)
+        if buttontjek==1:
+            TestCallData={
+                "Name":socket.gethostname()
+            }
+            testresponse = requests.post(testurl,json=TestCallData)
+            print(testresponse.text)
+            testlog= open("Log","a")
+            testlog.write("Test Log:"+testresponse.text)
+            grovepi.digitalWrite(ledtwo,1)
+            time.sleep(6)
+            grovepi.digitalWrite(ledtwo,0)
+  
+            
+
+while True:
+    try:
+        if startmessage == True:
+            print("System er startet")
+            startmessage=False
+            isExisting = os.path.exists(path)
+            x = threading.Thread(target=buttontest,name="x")
+            x.start()
+        if(isExisting==False):
+            firstContactData = {
+                "StartKey":"2doitStartKey",
+                "Name":socket.gethostname()
+            }
+            response = requests.get(logurl,json=firstContactData)
+            response.raise_for_status()
+            responseText = response.text
+            file = open(path,'w+')
+            file.write(responseText)
+            file.close()
+        else:
+            tjekomtemp=True
+            while(tjekomtemp):
+                [temp,humidity] = grovepi.dht(8,1)
+                if temp !="nan" and humidity !="nan":
+                    tjekomtemp=False
+                else:
+                    if temp is 0 and humidity is 0:
+                        tjekomtemp = False
+                    else:
+                        print(temp,humidity)
+                        tjekomtemp = True
+            noise = grovepi.analogRead(sound_sensor)
+            f = open('ID','r')
+            Id = f.read()
+            f.close()
+            Logdata={
+                "Id":Id,
+                "Loudness":int(round(noise)),
+                "Hotness":int(round(temp)),
+                "Humidity":int(round(humidity))
+            }
+            responsePost= requests.post(logurl,json=Logdata)
+            status = responsePost.text
+            today = date.today()
+            print(status)
+            if(responsePost.text=="Insertet"):
+                grovepi.digitalWrite(led,1)
+                time.sleep(2)
+                grovepi.digitalWrite(led,0)
+                erro= open("Log","a")
+                erro.write("log:"+str(today)+"\n")
+                erro.close()
+            else:
+                erro= open("Log",'a')
+                erro.write("Error log:"+str(status)+", "+str(today)+"\n")
+                erro.close()
+        time.sleep(300)
+    except ValueError as exe:
+        today = date.today()
+        erro= open("Log",'a')
+        erro.write("Error log:"+str(exe)+", "+str(today)+"\n")
+        erro.close()
+        # print(grovepi.digitalRead(button))
+        #isExisting = os.path.exists(path)
+        #if(isExisting==False):
+        #   response=requests.get(FirstContatUrl)
+            
+        
+        #ssensor_value = grovepi.analogRead(sound_sensor)
+        # print(ssensor_value)
+        #buttontjek = grovepi.digitalRead(button)
+        # time.sleep(0)
+        #if (buttontjek == 1):
+        #    response = requests.get(testurl)
+        #    response.raise_for_status()
+        #    jsonResponse = response.text
+        #    grovepi.digitalWrite(led,1)
+        #    time.sleep(1)
+        #    grovepi.digitalWrite(led,0)
+        #    if(jsonResponse is None):
+        #        print("virker ikke")
+        #    else:
+        #        print(jsonResponse)
+        #[temp,humidity] = grovepi.dht(humidityandtemp,white)  
+        # if math.isnan(temp) == False and math.isnan(humidity) == False:
+        #     print("temp = %.02f C humidity =%.02f%%"%(temp, humidity))
