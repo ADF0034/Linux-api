@@ -1,0 +1,146 @@
+from cgitb import text
+from crypt import methods
+from glob import escape
+import json
+from pickletools import string1
+from re import S
+import string
+from unicodedata import name
+from urllib import response
+from flask import Flask,jsonify
+from flask import request
+from flask import redirect
+from flask import url_for
+from mysql.connector import connection
+from mysql.connector import errorcode
+from datetime import date
+import uuid
+import datetime
+app = Flask(__name__)
+
+@app.route('/')
+
+def index():
+    cnx = connection.MySQLConnection(user='admin', password='far',
+                                 host='localhost',
+                                 database='Linux')
+    cursor = cnx.cursor()
+    query ='SELECT * FROM `Unites`'
+    somm:string="hey"
+    cursor.execute('SELECT ID FROM `Unites` LIMIT 1')
+    fetchdata = cursor.fetchone()
+
+    cursor.close()
+    cnx.close()
+
+    if fetchdata == None:
+        return  'no data'
+    else:
+        return f'{fetchdata}'
+
+@app.route("/<username>")
+def show_user_profile(username):
+    return f'User {escape(username)}'
+if  __name__ == "__main__":
+    app.run(debug=True)
+
+@app.route('/login', methods=['GET','POST'])
+def login():
+    if  request.method == 'POST':
+        response = jsonify({
+            "result" : 'we',
+            "status" : 200,
+        })
+        return 'response'
+    elif request.method == 'GET':
+        return ''
+
+@app.route('/test',methods=['POST'])
+def test():
+    data = request.get_json()
+    myuuid = uuid.uuid4() 
+    return f"{data} , {myuuid}"
+
+@app.route('/testrun',methods=['POST'])
+def testrun():
+    try:
+        cnx = connection.MySQLConnection(user='root', password='far',host='localhost',database='Linux')
+        testcursor = cnx.cursor()
+        data = request.get_json()
+        now = date.today()
+        testname=data["Name"]
+        testquery = "INSERT INTO `TestCall` (Name,Time) values(%s,%s)"
+        testcursor.execute("INSERT INTO `TestCall`(Name,Time)values(%s,%s)",(testname,now))
+        cnx.commit()
+        testcursor.close
+        cnx.close()
+        return str(("testrun execute d"+str(now)+" and was a sucess "))
+    except ValueError as exe:
+        return "fejl" 
+@app.route('/DB',methods=['GET','POST'])
+def test2():
+    try:
+        now = date.today()
+        cnx = connection.MySQLConnection(user='root', password='far',host='localhost',database='Linux')
+        cursor = cnx.cursor()
+        if request.method == 'GET':
+            data = request.get_json()
+            key = str(data['StartKey'])
+            newdata = tuple(key,)
+            Name = data['Name']
+            query="select EXISTS(SELECT * FROM `StartKey` WHERE StartKey='"+key+"')"
+            
+            cursor.execute(query)
+            Resqdata=cursor.fetchone()
+            #return f"{Resqdata[0]}"
+            if Resqdata[0] == 1:
+                #return "test1"
+                myuuid = uuid.uuid1()
+                s=str(myuuid)
+                cursor.execute('INSERT INTO `Unites`(Id,Name,LoudnessThreshold,HotnessThreshold,HumidityThreshold,OprettelseDato) values(%s,%s,%s,%s,%s,%s)',(s,Name,40,25,50,now))
+                cnx.commit()
+                cursor.close
+                cnx.close()
+                return s,200
+            else:
+                return "Fejl i get",400
+        elif request.method == 'POST':
+
+            data = request.get_json()
+            # return "test1"
+            if(data != None):
+                #return "test2"
+                Id = str(data['Id'])
+                Loudness = data['Loudness']
+                Hotness = data['Hotness']
+                Humidity = data['Humidity']
+                #return "test3"
+                cursor.execute("SELECT LoudnessThreshold,HotnessThreshold,HumidityThreshold FROM `Unites` WHERE Id = '"+Id+"'")
+                DBdata = cursor.fetchone()
+                #return "Test4"
+                if DBdata is None:
+                    return "getfejl ipost",400
+                else:
+                    #return "test5"
+                    LoudnessDB = DBdata[0]
+                    HotnessDB = DBdata[1]
+                    HumidityDB = DBdata[2]
+                    if (Loudness>=LoudnessDB) or (Hotness>=HotnessDB) or (Humidity>=HumidityDB):
+                        #return "test6"
+                        cursor.execute('INSERT INTO `ErrorLogs`(Unit,Loudness,Hotness,Humidity,LogDate) values(%s,%s,%s,%s,%s)',(Id,Loudness,Hotness,Humidity,now))
+                        cnx.commit()
+                        #return "test7 error virker"
+
+                    else:
+                        #return "test6 before logs"
+                        cursor.execute('INSERT INTO `Logs`(Unit,Loudness,Hotness,Humidity,LogDate) values(%s,%s,%s,%s,%s)',(Id,Loudness,Hotness,Humidity,now))
+                        cnx.commit()
+                        #return "test6 logs virker"
+                    cursor.close
+                    cnx.close
+                return "Insertet",200
+            else:
+                return "fejl i post",400
+    except ValueError as exe:
+        return exe
+
